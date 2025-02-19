@@ -5,7 +5,20 @@ export const freighterConfig: WalletActions = {
   name: SupportedWallets.Freighter,
   website: 'https://freighter.app',
 
-  isAvailable: () => typeof window !== 'undefined' && !!freighterApi.isConnected(),
+  isAvailable: () =>
+    new Promise((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 250);
+      freighterApi
+        .isConnected()
+        .then(({ isConnected, error }) => {
+          clearTimeout(timeout);
+          resolve(!error && isConnected);
+        })
+        .catch(() => {
+          clearTimeout(timeout);
+          resolve(false);
+        });
+    }),
 
   connect: async () => {
     try {
@@ -13,6 +26,11 @@ export const freighterConfig: WalletActions = {
         throw new Error('Freighter Wallet is not installed or connected.');
       }
       const result = await freighterApi.requestAccess();
+
+      if (result.address.trim() === '') {
+        throw new Error('Failed to connect to Freighter.');
+      }
+
       return { publicKey: result.address };
     } catch (error) {
       console.error('Error connecting to Freighter:', error);

@@ -1,20 +1,18 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
-import clsx from 'clsx';
+import React, { useEffect, useRef, useState } from 'react';
 
+import { useProvider } from '../../context/provider';
 import { getBorderRadius } from '../../utils/getBorderRadius';
 import { useModalAnimation } from '../../hooks/useModalAnimation';
-import { ProviderContext, defaultAppearance } from '../../context/provider';
 
 import ModalHeader from './Header';
 import ModalBackdrop from './Backdrop';
 
 interface ModalProps {
   isOpen: boolean;
-  className?: string;
   onClose?: () => void;
   onBack?: () => void;
   children: React.ReactNode;
-  icon: 'info' | 'back';
+  icon?: 'info' | 'back';
   onInfo?: () => void;
   closeButton?: boolean;
   modalHeader: string;
@@ -27,34 +25,24 @@ const Modal = ({
   onBack,
   onInfo,
   children,
-  className,
   modalHeader,
   icon,
   initialHeight,
-  closeButton = false,
+  closeButton = true,
 }: ModalProps) => {
-  const context = useContext(ProviderContext);
-  const { isOpening, isClosing, hasTransition, handleClose, setHasTransition } =
-    useModalAnimation(isOpen);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [heightChanged, setHeightChanged] = useState(false);
+
+  const context = useProvider();
+  const { isOpening, isClosing, hasTransition, handleClose, setHasTransition } =
+    useModalAnimation(isOpen);
+
   const contentRef = useRef<HTMLDivElement>(null);
   const isFirstRender = useRef(true);
   const previousChildrenRef = useRef(children);
-  const previousHeightRef = useRef<number>(initialHeight);
+  const previousHeightRef = useRef<number>(400);
 
-  const modalStyle = context?.value.appearance || defaultAppearance;
-
-  useEffect(() => {
-    if (!isOpen) {
-      setContentHeight(null);
-      setHeightChanged(false);
-      isFirstRender.current = true;
-      previousChildrenRef.current = children;
-      previousHeightRef.current = initialHeight;
-      return;
-    }
-  }, [isOpen, initialHeight]);
+  const modalStyle = context.value.appearance;
 
   useEffect(() => {
     if (!isOpen || !contentRef.current) return;
@@ -68,8 +56,7 @@ const Modal = ({
         isFirstRender.current = false;
         return;
       }
-
-      if (newHeight !== previousHeightRef.current) {
+      if (!isFirstRender.current && newHeight !== previousHeightRef.current) {
         setContentHeight(newHeight);
         setHeightChanged(true);
         previousHeightRef.current = newHeight;
@@ -85,6 +72,17 @@ const Modal = ({
     return () => resizeObserver.disconnect();
   }, [isOpen, children]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setContentHeight(null);
+      setHeightChanged(false);
+      isFirstRender.current = true;
+      previousChildrenRef.current = children;
+      previousHeightRef.current = initialHeight;
+      return;
+    }
+  }, [isOpen]);
+
   const currentHeight = isFirstRender.current
     ? initialHeight
     : contentHeight ?? previousHeightRef.current;
@@ -93,39 +91,35 @@ const Modal = ({
 
   return (
     <>
-      {!context?.value.isDemo && (
+      {!context.value.isDemo && (
         <ModalBackdrop isClosing={isClosing} onClose={() => handleClose(onClose)} />
       )}
 
       <div
-        className={clsx(
-          'absolute inset-0 flex items-center justify-center z-[9999]',
-          isClosing && 'animate-fadeOut',
-        )}
+        className={`absolute inset-0 flex items-center justify-center z-[9999] ${
+          isClosing && 'animate-fadeOut'
+        }`}
         onClick={(e) => e.target === e.currentTarget && handleClose(onClose)}
       >
         <div
-          className={clsx(
-            'overflow-hidden border',
-            className,
-            modalStyle.font && `!font-[${modalStyle.font}]`,
-          )}
+          className="relative overflow-hidden w-[360px] shadow-[0px_4px_80px_0px_#00000008] border border-primary-100 box-border"
           style={{
             height: `${currentHeight}px`,
-            transform: isOpening ? 'scale(0.98)' : 'scale(1)',
+            // transform: isOpening ? 'scale(0.98)' : 'scale(1)',
             opacity: isOpening ? '0' : '1',
             transition: isOpening
               ? 'transform 300ms ease-out, opacity 300ms ease-out'
               : hasTransition
               ? 'height 300ms ease-in-out'
-              : 'none',
+              : 'transition-all',
             backgroundColor: modalStyle.background,
             color: modalStyle.textColor,
             fontFamily: modalStyle.font,
+            letterSpacing: '-0.03px',
             borderRadius: getBorderRadius(modalStyle.cornerRadius),
           }}
         >
-          <div ref={contentRef} className="px-6 pb-4">
+          <div ref={contentRef} className="px-6 pb-4 transition-all">
             <ModalHeader
               icon={icon}
               onInfo={onInfo}

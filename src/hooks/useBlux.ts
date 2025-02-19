@@ -1,37 +1,61 @@
-import { useContext } from 'react';
-import { ProviderContext } from '../context/provider';
+import { useProvider } from '../context/provider';
+import { Routes } from '../types';
 
 export const useBlux = () => {
-  const context = useContext(ProviderContext);
-
+  const context = useProvider();
   if (!context) {
     throw new Error('useBlux must be used within a ProviderContext.');
   }
 
-  const { value, setValue } = context;
+  const { value, setValue, setRoute } = context;
+  const { isAuthenticated, user } = value;
 
-  const connect = async () => {
-    setValue((prev) => {
-      if (prev.openModal) {
-        return prev;
-      }
-      return { ...prev, openModal: true };
-    });
+  const connect = () => {
+    setValue((prev) => (prev.openModal ? prev : { ...prev, openModal: true }));
   };
 
-  const disconnect = async () => {
-    setValue({
-      ...value,
+  const disconnect = () => {
+    setValue((prev) => ({
+      ...prev,
       user: { wallet: null },
       openModal: false,
-    });
+      isAuthenticated: false,
+    }));
+    setRoute(Routes.ONBOARDING);
   };
+
+  const profile = () => {
+    if (!isAuthenticated) {
+      throw new Error('User is not authenticated.');
+    }
+    setRoute(Routes.PROFILE);
+    setValue((prev) => ({ ...prev, openModal: true }));
+  };
+
+  const signTransaction = (xdr: string) =>
+    new Promise((resolve, reject) => {
+      if (!isAuthenticated) {
+        reject(new Error('User is not authenticated.'));
+      }
+      setRoute(Routes.SIGN_TRANSACTION);
+      setValue((prev) => ({
+        ...prev,
+        openModal: true,
+        signTransaction: {
+          ...prev.signTransaction,
+          xdr,
+          resolver: resolve,
+        },
+      }));
+    });
 
   return {
     connect,
     disconnect,
-    isReady: value?.ready || false,
-    user: value?.user || null,
-    isAuthenticated: value?.isAuthenticated || false,
+    profile,
+    signTransaction,
+    isReady: value.isReady ?? false,
+    user: user ?? null,
+    isAuthenticated: isAuthenticated ?? false,
   };
 };
